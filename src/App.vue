@@ -1,160 +1,123 @@
-<script setup lang="ts">
-import { ref } from "vue";
-import { invoke } from "@tauri-apps/api/core";
-
-const greetMsg = ref("");
-const name = ref("");
-
-async function greet() {
-  // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-  greetMsg.value = await invoke("greet", { name: name.value });
-}
-</script>
-
 <template>
-  <main class="container">
-    <h1>Welcome to Tauri + Vue</h1>
-
+  <div id="root">
+    <h1>坐标转换应用</h1>
     <div class="row">
-      <a href="https://vitejs.dev" target="_blank">
-        <img src="/vite.svg" class="logo vite" alt="Vite logo" />
-      </a>
-      <a href="https://tauri.app" target="_blank">
-        <img src="/tauri.svg" class="logo tauri" alt="Tauri logo" />
-      </a>
-      <a href="https://vuejs.org/" target="_blank">
-        <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-      </a>
+      <div class="select">
+        <el-select v-model="sourceCRS" placeholder="选择源坐标系">
+          <el-option
+            v-for="option in options"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        <el-select v-model="targetCRS" placeholder="选择目标坐标系">
+          <el-option
+            v-for="option in options"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+      </div>
+      <div class="upload">
+        <el-upload
+          class="upload-demo"
+          drag
+          multiple
+          :on-change="handleFileChange"
+          :on-remove="handleRemove"
+          :auto-upload="false"
+          :show-file-list="false"
+        >
+          <i class="el-icon-upload"></i>
+          <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+        </el-upload>
+      </div>
     </div>
-    <p>Click on the Tauri, Vite, and Vue logos to learn more.</p>
-
-    <form class="row" @submit.prevent="greet">
-      <input id="greet-input" v-model="name" placeholder="Enter a name..." />
-      <button type="submit">Greet</button>
-    </form>
-    <p>{{ greetMsg }}</p>
-  </main>
+    <el-button type="primary" @click="convertFiles" style="width: 100%"
+      >转换文件</el-button
+    >
+    <div class="result">
+      <el-table :data="fileList">
+        <el-table-column prop="name" label="文件名" />
+        <el-table-column prop="status" label="状态" />
+      </el-table>
+    </div>
+  </div>
 </template>
 
-<style scoped>
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
+<script setup>
+import { ref } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
 
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #249b73);
-}
+const sourceCRS = ref('WGS84');
+const targetCRS = ref('GCJ02');
+const options = ref([
+  { label: 'WGS84', value: 'WGS84' },
+  { label: 'GCJ02', value: 'GCJ02' },
+]);
+const fileList = ref([]);
 
-</style>
+const uploadUrl = '/upload'; // 假设的上传 URL
+
+const handleFileChange = (file, files) => {
+  // 更新文件列表
+  fileList.value = files;
+  console.log(fileList.value);
+};
+
+const handleRemove = (file, fileList) => {
+  // 处理文件移除
+  fileList.value = fileList;
+  console.log(fileList);
+};
+
+const convertFiles = async () => {
+  for (const file of fileList.value) {
+    const result = await invoke('convert_coordinates', {
+      file: file.raw,
+      sourceCRS: sourceCRS.value,
+      targetCRS: targetCRS.value,
+    });
+    file.status = result.success ? '转换成功' : '转换失败';
+  }
+};
+</script>
+
 <style>
-:root {
-  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-
-  color: #0f0f0f;
-  background-color: #f6f6f6;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
-}
-
-.container {
-  margin: 0;
-  padding-top: 10vh;
+#root {
+  text-align: center;
+  font-family: Arial, sans-serif;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  text-align: center;
+  align-items: center;
 }
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
+.result {
+  width: 100%;
+  flex: 1;
+  overflow: auto;
+  margin-top: 12px;
 }
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
+.upload-demo {
+  margin: 20px 0;
 }
-
 .row {
+  width: 100%;
   display: flex;
-  justify-content: center;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
 }
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+.row > .select {
+  flex: 1;
+  margin-right: 20px;
+  display: flex;
+  flex-direction: column;
+  height: 101px;
+  justify-content: space-around;
 }
-
-a:hover {
-  color: #535bf2;
+.row > .upload {
+  flex: 3;
 }
-
-h1 {
-  text-align: center;
-}
-
-input,
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
-  outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #2f2f2f;
-  }
-
-  a:hover {
-    color: #24c8db;
-  }
-
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
-  }
-  button:active {
-    background-color: #0f0f0f69;
-  }
-}
-
 </style>
