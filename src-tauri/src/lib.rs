@@ -2,6 +2,7 @@ use serde_json::Value as JsonValue;
 use std::f64::consts::PI;
 use tauri::command;
 use std::path::PathBuf;
+use std::fs;  // 添加这一行
 
 /// 判断是否在中国范围内
 fn out_of_china(lon: f64, lat: f64) -> bool {
@@ -142,7 +143,14 @@ fn process_feature(feature: &mut JsonValue, conversion_fn: fn(f64, f64) -> (f64,
 }
 
 #[tauri::command]
-fn convert_geojson_coordinates(mut geojson: JsonValue, source: &str, target: &str) -> JsonValue {
+fn convert_geojson_coordinates(input: String,output: String, source: &str, target: &str) -> Result<String, String> {
+     // 读取输入文件
+    let content = fs::read_to_string(&input)
+        .map_err(|e| format!("读取文件失败: {}", e))?;
+    
+    // 解析 JSON
+    let mut geojson: JsonValue = serde_json::from_str(&content)
+        .map_err(|e| format!("解析 JSON 失败: {}", e))?;
     if let Some(conversion_fn) = get_conversion_method(source, target) {
         if let Some(geojson_type) = geojson.get("type").and_then(|t| t.as_str()) {
             match geojson_type {
@@ -173,7 +181,12 @@ fn convert_geojson_coordinates(mut geojson: JsonValue, source: &str, target: &st
     } else {
         eprintln!("Unsupported conversion from {} to {}", source, target);
     }
-    geojson
+     // 写入转换后的文件
+    let converted_json = serde_json::to_string(&geojson)
+        .map_err(|e| format!("序列化 JSON 失败: {}", e))?;
+    
+    write_file_with_path(output.clone(), converted_json)?;
+    Ok(output)
 }
 #[tauri::command]
 fn write_file_with_path(path: String, content: String) -> Result<String, String> {

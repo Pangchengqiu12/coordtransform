@@ -2,11 +2,6 @@
   <div id="root">
     <div class="header">
       <h1>坐标转换应用</h1>
-      <div class="selectSaveFolder">
-        <el-button type="primary" @click="selectSaveFolder"
-          >选择保存文件夹</el-button
-        >
-      </div>
     </div>
     <div class="row">
       <div class="select">
@@ -83,6 +78,12 @@
       />
       <el-button type="primary" @click="convertPoint">转换</el-button>
     </div>
+    <div class="fileHeader">
+      <span>{{ saveFolder }}</span>
+      <el-button type="primary" @click="selectSaveFolder"
+        >选择保存文件夹</el-button
+      >
+    </div>
     <div class="result">
       <el-table :data="fileList">
         <el-table-column prop="name" label="文件名" />
@@ -93,7 +94,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { appDataDir, join, basename } from "@tauri-apps/api/path";
@@ -168,20 +169,14 @@ const fileList = ref([]); //文件列表
 // 转换文件
 const convertFiles = async () => {
   const time = Date.now().toString();
-  const saveDirPath = await join(saveFolder.value, time);
   fileList.value.forEach(async (file) => {
-    const content = await readTextFile(file.path);
-    const data = JSON.parse(content);
+    const fileName = await basename(file.path); //文件名
+    const path = await join(saveFolder.value, time, fileName); //保存路径
     const result = await invoke("convert_geojson_coordinates", {
-      geojson: data,
+      input: file.path,
+      output: path,
       source: sourceCRS.value,
       target: targetCRS.value,
-    });
-    const fileName = await basename(file.path);
-    const path = await join(saveDirPath, fileName);
-    let res = await invoke("write_file_with_path", {
-      path,
-      content: JSON.stringify(result),
     });
     file.status = "已转换";
     file.path = path;
@@ -197,6 +192,21 @@ function isCoordinate() {
   }
   return true;
 }
+async function setSaveFolder(val) {
+  if (!val) {
+    val = await appDataDir();
+  }
+  saveFolder.value = val;
+  localStorage.setItem("saveFolder", saveFolder.value);
+}
+onMounted(() => {
+  let saveFolderLocal = localStorage.getItem("saveFolder");
+  if (saveFolderLocal) {
+    saveFolder.value = saveFolderLocal;
+  } else {
+    setSaveFolder();
+  }
+});
 </script>
 
 <style>
