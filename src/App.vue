@@ -79,7 +79,7 @@
       <el-button type="primary" @click="convertPoint">转换</el-button>
     </div>
     <div class="fileHeader">
-      <span>{{ saveFolder }}</span>
+      <div class="saveFolder">{{ saveFolder }}</div>
       <el-button type="primary" @click="selectSaveFolder"
         >选择保存文件夹</el-button
       >
@@ -94,21 +94,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
-import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
-import { appDataDir, join, basename } from "@tauri-apps/api/path";
-import { readTextFile } from "@tauri-apps/plugin-fs";
-const point = ref("");
-const pointResult = ref("");
+import { ref, onMounted } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
+import { appDataDir, join, basename } from '@tauri-apps/api/path';
+import { readTextFile } from '@tauri-apps/plugin-fs';
+const point = ref('');
+const pointResult = ref('');
 const openFileDialog = async () => {
   const files = await open({
     multiple: true,
     directory: false,
     filters: [
       {
-        name: "geojson",
-        extensions: ["geojson", "json"],
+        name: 'geojson',
+        extensions: ['geojson', 'json'],
       },
     ],
   });
@@ -118,7 +118,7 @@ const openFileDialog = async () => {
     fileList.value.push({
       name,
       path: i,
-      status: "未转换",
+      status: '未转换',
     });
   });
 };
@@ -127,16 +127,16 @@ const convertPoint = async () => {
   if (sourceCRS.value === targetCRS.value) {
     return;
   }
-  if (sourceCRS.value === "WGS84") {
-    let [lon, lat] = point.value.split(",");
-    let result = await invoke("wgs84_to_gcj02", {
+  if (sourceCRS.value === 'WGS84') {
+    let [lon, lat] = point.value.split(',');
+    let result = await invoke('wgs84_to_gcj02', {
       lon: Number(lon),
       lat: Number(lat),
     });
     pointResult.value = `${result[0]},${result[1]}`;
-  } else if (sourceCRS.value === "GCJ02") {
-    let [lon, lat] = point.value.split(",");
-    let result = await invoke("gcj02_to_wgs84", {
+  } else if (sourceCRS.value === 'GCJ02') {
+    let [lon, lat] = point.value.split(',');
+    let result = await invoke('gcj02_to_wgs84', {
       lon: Number(lon),
       lat: Number(lat),
     });
@@ -144,41 +144,42 @@ const convertPoint = async () => {
   }
 };
 // 选择保存文件夹
-const saveFolder = ref("");
+const saveFolder = ref('');
 const selectSaveFolder = async () => {
   const path = await open({
     multiple: false,
     directory: true,
   });
-  saveFolder.value = path;
+  setSaveFolder(path);
 };
 // 选择文件夹
 const openFolderDialog = async () => {
-  const files = await open({
-    multiple: true,
-    directory: true,
+  if (!fileList.value.length) return;
+  await invoke('open_file_location', {
+    path: fileList.value[0].path,
   });
 };
-const sourceCRS = ref("WGS84");
-const targetCRS = ref("GCJ02");
+const sourceCRS = ref('WGS84');
+const targetCRS = ref('GCJ02');
 const options = ref([
-  { label: "WGS84", value: "WGS84" },
-  { label: "GCJ02", value: "GCJ02" },
+  { label: 'WGS84', value: 'WGS84' },
+  { label: 'GCJ02', value: 'GCJ02' },
 ]);
 const fileList = ref([]); //文件列表
 // 转换文件
 const convertFiles = async () => {
+  if (!isCoordinate) return;
   const time = Date.now().toString();
   fileList.value.forEach(async (file) => {
     const fileName = await basename(file.path); //文件名
     const path = await join(saveFolder.value, time, fileName); //保存路径
-    const result = await invoke("convert_geojson_coordinates", {
+    const result = await invoke('convert_geojson_coordinates', {
       input: file.path,
       output: path,
       source: sourceCRS.value,
       target: targetCRS.value,
     });
-    file.status = "已转换";
+    file.status = '已转换';
     file.path = path;
   });
 };
@@ -197,10 +198,10 @@ async function setSaveFolder(val) {
     val = await appDataDir();
   }
   saveFolder.value = val;
-  localStorage.setItem("saveFolder", saveFolder.value);
+  localStorage.setItem('saveFolder', saveFolder.value);
 }
 onMounted(() => {
-  let saveFolderLocal = localStorage.getItem("saveFolder");
+  let saveFolderLocal = localStorage.getItem('saveFolder');
   if (saveFolderLocal) {
     saveFolder.value = saveFolderLocal;
   } else {
@@ -217,15 +218,19 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
 }
-.header {
+.fileHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   width: 100%;
-  position: relative;
+  margin-top: 12px;
 }
-.selectSaveFolder {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
+.saveFolder {
+  max-width: 500px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 12px;
 }
 .point {
   width: 100%;

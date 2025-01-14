@@ -1,8 +1,10 @@
 use serde_json::Value as JsonValue;
 use std::f64::consts::PI;
-use tauri::command;
+use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
-use std::fs;  // 添加这一行
+use std::process::Command;
+use tauri::command;
 
 /// 判断是否在中国范围内
 fn out_of_china(lon: f64, lat: f64) -> bool {
@@ -143,14 +145,18 @@ fn process_feature(feature: &mut JsonValue, conversion_fn: fn(f64, f64) -> (f64,
 }
 
 #[tauri::command]
-fn convert_geojson_coordinates(input: String,output: String, source: &str, target: &str) -> Result<String, String> {
-     // 读取输入文件
-    let content = fs::read_to_string(&input)
-        .map_err(|e| format!("读取文件失败: {}", e))?;
-    
+fn convert_geojson_coordinates(
+    input: String,
+    output: String,
+    source: &str,
+    target: &str,
+) -> Result<String, String> {
+    // 读取输入文件
+    let content = fs::read_to_string(&input).map_err(|e| format!("读取文件失败: {}", e))?;
+
     // 解析 JSON
-    let mut geojson: JsonValue = serde_json::from_str(&content)
-        .map_err(|e| format!("解析 JSON 失败: {}", e))?;
+    let mut geojson: JsonValue =
+        serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败: {}", e))?;
     if let Some(conversion_fn) = get_conversion_method(source, target) {
         if let Some(geojson_type) = geojson.get("type").and_then(|t| t.as_str()) {
             match geojson_type {
@@ -181,28 +187,47 @@ fn convert_geojson_coordinates(input: String,output: String, source: &str, targe
     } else {
         eprintln!("Unsupported conversion from {} to {}", source, target);
     }
-     // 写入转换后的文件
-    let converted_json = serde_json::to_string(&geojson)
-        .map_err(|e| format!("序列化 JSON 失败: {}", e))?;
-    
+    // 写入转换后的文件
+    let converted_json =
+        serde_json::to_string(&geojson).map_err(|e| format!("序列化 JSON 失败: {}", e))?;
+
     write_file_with_path(output.clone(), converted_json)?;
     Ok(output)
 }
 #[tauri::command]
 fn write_file_with_path(path: String, content: String) -> Result<String, String> {
     let path = PathBuf::from(path);
-    
+
     // 确保父目录存在
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("创建目录失败: {}", e))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
-    
+
     // 写入文件
-    std::fs::write(&path, content)
-        .map_err(|e| format!("写入文件失败: {}", e))?;
-    
+    std::fs::write(&path, content).map_err(|e| format!("写入文件失败: {}", e))?;
+
     Ok(path.to_string_lossy().into_owned())
+}
+#[command]
+fn open_file_location(path: String) -> Result<(), String> {
+    let path = Path::new(&path);
+
+    // 根据操作系统选择不同的打开文件夹命令
+    #[cfg(target_os = "windows")]
+    let result = Command::new("explorer").arg("/select,").arg(path).spawn();
+
+    #[cfg(target_os = "macos")]
+    let result = Command::new("open").arg("-R").arg(path).spawn();
+
+    #[cfg(target_os = "linux")]
+    let result = Command::new("xdg-open")
+        .arg(path.parent().unwrap_or(path))
+        .spawn();
+
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Failed to open file location: {}", e)),
+    }
 }
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -214,7 +239,8 @@ pub fn run() {
             gcj02_to_wgs84,
             wgs84_to_gcj02,
             convert_geojson_coordinates,
-            write_file_with_path
+            write_file_with_path,
+            open_file_location
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
