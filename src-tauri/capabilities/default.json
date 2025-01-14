@@ -5,6 +5,38 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "opener:default"
+    "opener:default",
+    "dialog:default",
+    "fs:allow-create",
+    "fs:allow-app-write",
+    "fs:allow-app-write-recursive",
+    "fs:scope",
+    "fs:write-files",
+    "fs:read-files",
+    "fs:allow-appdata-read",
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [
+        {
+          "path": "*"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-rename",
+      "allow": [
+        {
+          "path": "*"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        {
+          "path": "*"
+        }
+      ]
+    }
   ]
 }
