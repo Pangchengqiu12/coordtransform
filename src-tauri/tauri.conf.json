@@ -16,7 +16,8 @@
         "title": "coordtransform",
         "width": 800,
         "height": 600,
-        "resizable": false
+        "resizable": false,
+        "maximizable": false
       }
     ],
     "security": {
