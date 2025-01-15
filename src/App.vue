@@ -108,7 +108,7 @@
         :data="fileList"
         :cell-style="{ textAlign: 'center' }"
         :header-cell-style="{ 'text-align': 'center' }"
-        height="100%"
+        height="90%"
       >
         <el-table-column prop="name" label="文件名" />
         <el-table-column prop="status" label="状态" width="200">
