@@ -221,7 +221,6 @@ const isRunning = computed(() => {
 const isDone = computed(() => {
   return fileList.value.length && !fileList.value.every((i) => i.status === 0);
 });
-
 const fileList = ref<FileList[]>([]); //文件列表
 // 转换文件
 const convertFiles = async () => {
