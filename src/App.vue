@@ -1,9 +1,15 @@
 <template>
   <div id="root">
     <div class="header">
-      <h1>坐标转换应用</h1>
+      <a
+        href="https://github.com/Pangchengqiu12/coordtransform"
+        target="_blank"
+      >
+        <img src="/logo.png" class="logo vite" alt="Vite logo" />
+      </a>
+      <h1>坐标系转换</h1>
     </div>
-    <div class="row">
+    <div class="row box">
       <div class="select">
         <el-select v-model="sourceCRS" placeholder="选择源坐标系">
           <el-option
@@ -21,7 +27,7 @@
             version="1.1"
             xmlns="http://www.w3.org/2000/svg"
             p-id="6967"
-            width="22"
+            width="20"
             height="32"
           >
             <path
@@ -42,7 +48,7 @@
       <div class="point">
         <el-input
           v-model="point"
-          style="width: 200px"
+          style="width: 300px"
           placeholder="输入经度,纬度。例如:116.0,39.0"
         />
         <div class="svg">
@@ -53,7 +59,7 @@
             version="1.1"
             xmlns="http://www.w3.org/2000/svg"
             p-id="6967"
-            width="22"
+            width="20"
             height="32"
           >
             <path
@@ -64,88 +70,111 @@
         </div>
         <el-input
           :value="pointResult"
-          style="width: 200px; margin-right: 12px"
-          placeholder="Please input"
+          style="width: 300px; margin-right: 12px"
+          placeholder=""
           disabled
         />
         <el-button type="primary" @click="convertPoint">转换</el-button>
       </div>
     </div>
 
-    <div class="upload">
-      <el-button type="primary" @click="openFileDialog">选择文件</el-button>
-      <el-button type="primary" @click="openFolderDialog"
-        >打开文件所在位置</el-button
-      >
-      <el-button type="primary" @click="convertFiles">转换文件</el-button>
-      <div class="fileHeader">
-        <el-button type="primary" @click="selectSaveFolder"
-          >选择保存文件夹</el-button
+    <div class="result box">
+      <div class="upload">
+        <el-button type="primary" plain @click="openFileDialog"
+          >选择文件</el-button
         >
-        <div class="saveFolder">{{ saveFolder }}</div>
+
+        <el-button type="success" @click="convertFiles">转换文件</el-button>
+        <el-button type="primary" @click="openFolderDialog"
+          >打开文件位置</el-button
+        >
+        <div class="fileHeader">
+          <el-button type="primary" @click="selectSaveFolder"
+            >选择保存文件夹</el-button
+          >
+          <el-text class="text">{{ saveFolder }}</el-text>
+        </div>
       </div>
-    </div>
-    <div class="result">
-      <el-table :data="fileList">
+      <el-table
+        :data="fileList"
+        :cell-style="{ textAlign: 'center' }"
+        :header-cell-style="{ 'text-align': 'center' }"
+        height="100%"
+      >
         <el-table-column prop="name" label="文件名" />
-        <el-table-column prop="status" label="状态" />
+        <el-table-column prop="status" label="状态" width="200">
+          <template #default="scope">
+            <el-tag v-if="scope.row.status === 0" type="primary">未转换</el-tag>
+            <el-tag v-else-if="scope.row.status === 1" type="success"
+              >已转换</el-tag
+            >
+            <el-tag v-else-if="scope.row.status === 2" type="danger"
+              >转换失败</el-tag
+            >
+            <el-tag v-else-if="scope.row.status === 3" type="warning"
+              >转换中</el-tag
+            >
+          </template>
+        </el-table-column>
       </el-table>
     </div>
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
-import { appDataDir, join, basename } from '@tauri-apps/api/path';
-import { readTextFile } from '@tauri-apps/plugin-fs';
-const point = ref('');
-const pointResult = ref('');
+<script setup lang="ts">
+import { ref, onMounted, computed } from "vue";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { appDataDir, join, basename } from "@tauri-apps/api/path";
+import type { FileList } from "./index";
+const point = ref("");
+const pointResult = ref("");
 const openFileDialog = async () => {
   const files = await open({
     multiple: true,
     directory: false,
     filters: [
       {
-        name: 'geojson',
-        extensions: ['geojson', 'json'],
+        name: "geojson",
+        extensions: ["geojson", "json"],
       },
     ],
   });
-  fileList.value = [];
-  files.forEach(async (i) => {
-    const name = await basename(i);
-    fileList.value.push({
-      name,
-      path: i,
-      status: '未转换',
+  if (files) {
+    fileList.value = [];
+    files.forEach(async (i) => {
+      const name = await basename(i);
+      fileList.value.push({
+        name,
+        path: i,
+        status: 0,
+      });
     });
-  });
+  }
 };
 // 转换单个点
 const convertPoint = async () => {
   if (sourceCRS.value === targetCRS.value || !point.value) {
     return;
   }
-  if (sourceCRS.value === 'WGS84') {
-    let [lon, lat] = point.value.split(',');
-    let result = await invoke('wgs84_to_gcj02', {
+  if (sourceCRS.value === "WGS84") {
+    let [lon, lat] = point.value.split(",");
+    let result = (await invoke("wgs84_to_gcj02", {
       lon: Number(lon),
       lat: Number(lat),
-    });
+    })) as [number, number];
     pointResult.value = `${result[0]},${result[1]}`;
-  } else if (sourceCRS.value === 'GCJ02') {
-    let [lon, lat] = point.value.split(',');
-    let result = await invoke('gcj02_to_wgs84', {
+  } else if (sourceCRS.value === "GCJ02") {
+    let [lon, lat] = point.value.split(",");
+    let result = (await invoke("gcj02_to_wgs84", {
       lon: Number(lon),
       lat: Number(lat),
-    });
+    })) as [number, number];
     pointResult.value = `${result[0]},${result[1]}`;
   }
 };
 // 选择保存文件夹
-const saveFolder = ref('');
+const saveFolder = ref("");
 const selectSaveFolder = async () => {
   const path = await open({
     multiple: false,
@@ -156,17 +185,17 @@ const selectSaveFolder = async () => {
 // 选择文件夹
 const openFolderDialog = async () => {
   if (!fileList.value.length) return;
-  await invoke('open_file_location', {
+  await invoke("open_file_location", {
     path: fileList.value[0].path,
   });
 };
-const sourceCRS = ref('WGS84');
-const targetCRS = ref('GCJ02');
+const sourceCRS = ref("WGS84");
+const targetCRS = ref("GCJ02");
 const options = ref([
-  { label: 'WGS84', value: 'WGS84' },
-  { label: 'GCJ02', value: 'GCJ02' },
+  { label: "WGS84", value: "WGS84" },
+  { label: "GCJ02", value: "GCJ02" },
 ]);
-const fileList = ref([]); //文件列表
+const fileList = ref<FileList[]>([]); //文件列表
 // 转换文件
 const convertFiles = async () => {
   if (!isCoordinate) return;
@@ -174,13 +203,13 @@ const convertFiles = async () => {
   fileList.value.forEach(async (file) => {
     const fileName = await basename(file.path); //文件名
     const path = await join(saveFolder.value, time, fileName); //保存路径
-    const result = await invoke('convert_geojson_coordinates', {
+    const result = await invoke("convert_geojson_coordinates", {
       input: file.path,
       output: path,
       source: sourceCRS.value,
       target: targetCRS.value,
     });
-    file.status = '已转换';
+    file.status = 1;
     file.path = path;
   });
 };
@@ -199,10 +228,10 @@ async function setSaveFolder(val) {
     val = await appDataDir();
   }
   saveFolder.value = val;
-  localStorage.setItem('saveFolder', saveFolder.value);
+  localStorage.setItem("saveFolder", saveFolder.value);
 }
 onMounted(() => {
-  let saveFolderLocal = localStorage.getItem('saveFolder');
+  let saveFolderLocal = localStorage.getItem("saveFolder");
   if (saveFolderLocal) {
     saveFolder.value = saveFolderLocal;
   } else {
@@ -218,6 +247,56 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  height: 97.4vh;
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+
+  color: #0f0f0f;
+  background-color: #f6f6f6;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  overflow: hidden;
+}
+.text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  text-indent: 12px;
+}
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #535bf2;
+}
+.logo {
+  height: 5em;
+  padding: 1em;
+  will-change: filter;
+  transition: 0.75s;
+}
+.logo.vite:hover {
+  filter: drop-shadow(0 0 1em #747bff);
+}
+.header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: center;
+}
+h1 {
+  color: #333;
 }
 .fileHeader {
   flex: 1;
@@ -233,6 +312,7 @@ onMounted(() => {
   margin-left: 12px;
 }
 .point {
+  width: 100%;
   display: flex;
   align-items: center;
 }
@@ -240,24 +320,31 @@ onMounted(() => {
   margin: 0 12px;
 }
 .result {
-  width: 100%;
+  box-sizing: border-box;
+  background-color: #fff;
+  width: 99%;
   flex: 1;
   overflow: auto;
-  margin-top: 12px;
+  margin-top: 6px;
 }
-
+.box {
+  border-radius: 4px;
+  padding: 6px 12px;
+  overflow: hidden;
+  box-shadow: 0 -3px 6px -2px rgba(0, 0, 0, 0.1),
+    0 3px 6px -2px rgba(0, 0, 0, 0.1), -3px 0 6px -2px rgba(0, 0, 0, 0.1),
+    3px 0 6px -2px rgba(0, 0, 0, 0.1);
+}
 .row {
-  width: 100%;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 20px;
+  box-sizing: border-box;
+  width: 99%;
+  background-color: #fff;
 }
 .row > .select {
   margin-right: 12px;
   display: flex;
   align-items: center;
-  width: 250px;
+  width: 644px;
   justify-content: space-around;
 }
 .upload {
