@@ -295,6 +295,20 @@ onMounted(() => {
 </script>
 
 <style>
+::-webkit-scrollbar {
+  width: 4px; /* Vertical scrollbar width */
+  height: 4px; /* Horizontal scrollbar height */
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1; /* Track background color */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888; /* Scrollbar handle color */
+  border-radius: 10px;
+}
 #root {
   position: relative;
   text-align: center;
@@ -320,11 +334,11 @@ onMounted(() => {
 }
 .text {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: auto;
+  /* text-overflow: ellipsis; */
   white-space: nowrap;
   text-align: left;
-  text-indent: 12px;
+  margin-left: 12px;
 }
 a {
   font-weight: 500;
@@ -355,6 +369,7 @@ h1 {
 }
 .fileHeader {
   flex: 1;
+  overflow: hidden;
   display: flex;
   align-items: center;
   margin-left: 12px;
@@ -406,5 +421,6 @@ h1 {
   display: flex;
   align-items: center;
   width: 100%;
+  overflow: hidden;
 }
 </style>

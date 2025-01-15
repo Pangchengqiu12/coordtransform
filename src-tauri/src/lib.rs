@@ -58,25 +58,25 @@ fn gcj02_to_wgs84(lon: f64, lat: f64) -> (f64, f64) {
         return (lon, lat); // 不在中国范围内，直接返回
     }
 
-    let (mut lon_tmp, mut lat_tmp) = (lon, lat);
-    let (mut d_lat, mut d_lon);
+    let a = 6378245.0; // 地球半径
+    let ee = 0.00669342162296594323; // 偏心率平方
 
-    loop {
-        let (mg_lon, mg_lat) = wgs84_to_gcj02(lon_tmp, lat_tmp);
-        d_lat = mg_lat - lat;
-        d_lon = mg_lon - lon;
+    let d_lat = transform_lat(lon - 105.0, lat - 35.0);
+    let d_lon = transform_lon(lon - 105.0, lat - 35.0);
+    let rad_lat = lat / 180.0 * PI;
+    let magic = 1.0 - ee * (rad_lat.sin() * rad_lat.sin());
+    let sqrt_magic = magic.sqrt();
 
-        // 提高精度：设置误差阈值为 1e-8
-        if d_lat.abs() < 1e-8 && d_lon.abs() < 1e-8 {
-            break;
-        }
+    let mg_lat = lat + (d_lat * 180.0) / ((a * (1.0 - ee)) / (magic * sqrt_magic) * PI);
+    let mg_lon = lon + (d_lon * 180.0) / (a / sqrt_magic * rad_lat.cos() * PI);
 
-        lat_tmp -= d_lat;
-        lon_tmp -= d_lon;
-    }
+    // WGS84 坐标是 GCJ02 坐标减去偏移量
+    let wgs_lon = lon * 2.0 - mg_lon;
+    let wgs_lat = lat * 2.0 - mg_lat;
 
-    (lon_tmp, lat_tmp) // 经度在前，纬度在后
+    (wgs_lon, wgs_lat) // 经度在前，纬度在后
 }
+
 fn get_conversion_method(source: &str, target: &str) -> Option<fn(f64, f64) -> (f64, f64)> {
     match (source, target) {
         ("WGS84", "GCJ02") => Some(wgs84_to_gcj02),
