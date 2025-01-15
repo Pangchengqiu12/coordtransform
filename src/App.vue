@@ -80,16 +80,25 @@
 
     <div class="result box">
       <div class="upload">
-        <el-button type="primary" plain @click="openFileDialog"
+        <el-button
+          type="primary"
+          plain
+          @click="openFileDialog"
+          :disabled="isRunning"
           >选择文件</el-button
         >
 
-        <el-button type="success" @click="convertFiles">转换文件</el-button>
+        <el-button type="success" :disabled="isRunning" @click="convertFiles"
+          >转换文件</el-button
+        >
         <el-button type="primary" @click="openFolderDialog"
           >打开文件位置</el-button
         >
         <div class="fileHeader">
-          <el-button type="primary" @click="selectSaveFolder"
+          <el-button
+            type="primary"
+            :disabled="isRunning"
+            @click="selectSaveFolder"
             >选择保存文件夹</el-button
           >
           <el-text class="text">{{ saveFolder }}</el-text>
@@ -127,9 +136,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { appDataDir, join, basename } from "@tauri-apps/api/path";
 import type { FileList } from "./index";
-import { ElMessage } from "element-plus";
 const point = ref("");
 const pointResult = ref("");
+// 选择需要转换的文件
 const openFileDialog = async () => {
   const files = await open({
     multiple: true,
@@ -156,6 +165,10 @@ const openFileDialog = async () => {
 // 转换单个点
 const convertPoint = async () => {
   if (sourceCRS.value === targetCRS.value || !point.value) {
+    ElMessage({
+      message: "源坐标系和目标坐标系不能相同，且坐标不能为空",
+      type: "warning",
+    });
     return;
   }
   if (sourceCRS.value === "WGS84") {
@@ -181,11 +194,17 @@ const selectSaveFolder = async () => {
     multiple: false,
     directory: true,
   })) as string;
-  setSaveFolder(path);
+  path && setSaveFolder(path);
 };
-// 选择文件夹
+// 打开文件位置
 const openFolderDialog = async () => {
-  if (!fileList.value.length) return;
+  if (!fileList.value.length) {
+    ElMessage({
+      message: "请先选择文件",
+      type: "warning",
+    });
+    return;
+  }
   await invoke("open_file_location", {
     path: fileList.value[0].path,
   });
@@ -196,22 +215,34 @@ const options = ref([
   { label: "WGS84", value: "WGS84" },
   { label: "GCJ02", value: "GCJ02" },
 ]);
+const isRunning = computed(() => {
+  return fileList.value.length && fileList.value.some((i) => i.status === 3);
+});
+const isDone = computed(() => {
+  return fileList.value.length && !fileList.value.every((i) => i.status === 0);
+});
+
 const fileList = ref<FileList[]>([]); //文件列表
 // 转换文件
 const convertFiles = async () => {
-  if (!isCoordinate) return;
+  if (!isCoordinate()) return;
   const time = Date.now().toString();
   fileList.value.forEach(async (file) => {
-    const fileName = await basename(file.path); //文件名
-    const path = await join(saveFolder.value, time, fileName); //保存路径
-    const result = await invoke("convert_geojson_coordinates", {
-      input: file.path,
-      output: path,
-      source: sourceCRS.value,
-      target: targetCRS.value,
-    });
-    file.status = 1;
-    file.path = path;
+    file.status = 3;
+    try {
+      const fileName = await basename(file.path); //文件名
+      const path = await join(saveFolder.value, time, fileName); //保存路径
+      await invoke("convert_geojson_coordinates", {
+        input: file.path,
+        output: path,
+        source: sourceCRS.value,
+        target: targetCRS.value,
+      });
+      file.status = 1;
+      file.path = path;
+    } catch (error) {
+      file.status = 2;
+    }
   });
 };
 //是否可以转换
@@ -222,16 +253,30 @@ function isCoordinate() {
       type: "warning",
     });
     return false;
-  }
-  if (sourceCRS.value === targetCRS.value) {
+  } else if (isRunning.value) {
+    ElMessage({
+      message: "文件转换中",
+      type: "warning",
+    });
+    return false;
+  } else if (sourceCRS.value === targetCRS.value) {
     ElMessage({
       message: "源坐标系和目标坐标系不能相同",
       type: "warning",
     });
     return false;
+  } else if (isDone.value) {
+    ElMessage({
+      message: "文件已全部转换",
+      type: "warning",
+    });
+    return false;
   }
+
   return true;
 }
+
+// 设置保存文件夹
 async function setSaveFolder(val?: string) {
   if (!val) {
     val = await appDataDir();
@@ -251,6 +296,7 @@ onMounted(() => {
 
 <style>
 #root {
+  position: relative;
   text-align: center;
   font-family: Arial, sans-serif;
   display: flex;
