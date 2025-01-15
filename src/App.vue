@@ -127,6 +127,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { appDataDir, join, basename } from "@tauri-apps/api/path";
 import type { FileList } from "./index";
+import { ElMessage } from "element-plus";
 const point = ref("");
 const pointResult = ref("");
 const openFileDialog = async () => {
@@ -176,10 +177,10 @@ const convertPoint = async () => {
 // 选择保存文件夹
 const saveFolder = ref("");
 const selectSaveFolder = async () => {
-  const path = await open({
+  const path = (await open({
     multiple: false,
     directory: true,
-  });
+  })) as string;
   setSaveFolder(path);
 };
 // 选择文件夹
@@ -216,14 +217,22 @@ const convertFiles = async () => {
 //是否可以转换
 function isCoordinate() {
   if (fileList.value.length === 0) {
+    ElMessage({
+      message: "请先选择文件",
+      type: "warning",
+    });
     return false;
   }
   if (sourceCRS.value === targetCRS.value) {
+    ElMessage({
+      message: "源坐标系和目标坐标系不能相同",
+      type: "warning",
+    });
     return false;
   }
   return true;
 }
-async function setSaveFolder(val) {
+async function setSaveFolder(val?: string) {
   if (!val) {
     val = await appDataDir();
   }
