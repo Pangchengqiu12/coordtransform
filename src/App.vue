@@ -109,6 +109,7 @@
         :cell-style="{ textAlign: 'center' }"
         :header-cell-style="{ 'text-align': 'center' }"
         height="90%"
+        :empty-text="'拖拽文件到这里,' + WARNING_MESSAGE"
       >
         <el-table-column prop="name" label="文件名" />
         <el-table-column prop="status" label="状态" width="200">
@@ -133,9 +134,45 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { appDataDir, join, basename } from "@tauri-apps/api/path";
 import type { FileList } from "./index";
+import { stat } from "@tauri-apps/plugin-fs";
+import { extname } from "@tauri-apps/api/path";
+import { EXTENSIONS, WARNING_MESSAGE } from "./constant";
+// 监听文件拖拽事件
+listen("tauri://drag-drop", async (event) => {
+  const files = (event.payload as any).paths;
+
+  let list: FileList[] = [];
+  for (const file of files) {
+    console.log(file);
+    const fileInfo = await stat(file);
+    if (fileInfo.isFile) {
+      const ext = await extname(file);
+      if (EXTENSIONS.includes(ext)) {
+        const name = await basename(file);
+        list.push({ name: name, path: file, status: 0 });
+      } else {
+        ElMessage({
+          message: WARNING_MESSAGE,
+          type: "warning",
+        });
+        list = fileList.value;
+        break;
+      }
+    } else {
+      ElMessage({
+        message: "暂不支持文件夹",
+        type: "warning",
+      });
+      list = fileList.value;
+      break;
+    }
+  }
+  fileList.value = list;
+});
 const point = ref("");
 const pointResult = ref("");
 // 选择需要转换的文件
@@ -146,7 +183,7 @@ const openFileDialog = async () => {
     filters: [
       {
         name: "geojson",
-        extensions: ["geojson", "json"],
+        extensions: EXTENSIONS,
       },
     ],
   });
